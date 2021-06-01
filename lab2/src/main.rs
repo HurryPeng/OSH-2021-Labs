@@ -37,11 +37,13 @@ fn main() -> !
                     env::set_current_dir(dir).expect("Changing current dir failed");
                     prev_cmd = None;
                 }
+                /*
                 "pwd" =>
                 {
                     println!("{}", env::current_dir().expect(dir_err).to_str().expect(dir_err));
                     prev_cmd = None;
                 }
+                */
                 "export" =>
                 {
                     for arg in args {
