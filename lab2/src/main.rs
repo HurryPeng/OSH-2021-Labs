@@ -1,9 +1,14 @@
 use std::io::{stdin, BufRead};
+use std::io::{stdout, Write};
 use std::env;
 use std::process::{exit, Command};
 
 fn main() -> ! {
     loop {
+        let dir_err = "Getting current dir failed";
+        print!("{}# ", env::current_dir().expect(dir_err).to_str().expect(dir_err));
+        stdout().flush();
+
         let mut cmd = String::new();
         for line_res in stdin().lock().lines() {
             let line = line_res.expect("Read a line from stdin failed");
