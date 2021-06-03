@@ -1,3 +1,4 @@
+
 use std::io::{stdin, BufRead};
 use std::io::{stdout, Write};
 use std::env;
@@ -7,6 +8,13 @@ use std::process::Child;
 
 fn main() -> !
 {
+    // Ctrl+C handle: clear current line and start a new line
+    ctrlc::set_handler(||{
+        let dir_err = "Getting current dir failed";
+        print!("\n{}# ", env::current_dir().expect(dir_err).to_str().expect(dir_err));
+        stdout().flush().unwrap();
+    }).expect("set handle error");
+
     loop
     {
         let dir_err = "Getting current dir failed";
@@ -27,7 +35,21 @@ fn main() -> !
         while let Some(cmd) = cmds.next()
         {
             let mut args = cmd.split_whitespace();
-            let prog = args.next().unwrap();
+            let prog = args.next();
+            match prog
+            {
+                // Ctrl+D hanle: exit
+                None =>
+                {
+                    println!("bye!");
+                    exit(0);
+                }
+                Some (_prog) =>
+                {
+                }
+            }
+
+            let prog = prog.unwrap();
 
             match prog
             {
@@ -56,6 +78,7 @@ fn main() -> !
                 }
                 "exit" =>
                 {
+                    println!("bye!");
                     exit(0);
                 }
                 prog => {
