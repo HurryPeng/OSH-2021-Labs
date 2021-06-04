@@ -43,9 +43,28 @@ fn main() -> !
         let mut cmds = input.trim().split(" | ").peekable();
         let mut prev_cmd = None;
 
-        while let Some(mut cmd) = cmds.next()
+        while let Some(cmd) = cmds.next()
         {
-            let mut args = cmd.split_whitespace();
+            let raw_args: Vec<&str> = cmd.split_whitespace().collect();
+            let mut args_str = String::new();
+            //let mut args = cmd.split_whitespace();
+            for arg in raw_args {
+                let mut arg_temp = String::new();
+                arg_temp += &arg;
+                if arg.starts_with("$")
+                {
+                    arg_temp = String::new();
+                    arg_temp += env::var_os(arg.strip_prefix("$").unwrap()).unwrap().to_str().unwrap();
+                    //println!("FOUND! {}", arg_temp);
+                }
+                args_str += &arg_temp;
+                args_str += " ";
+                //println!("APPENDED {}", args_str);
+            }
+            //println!("ARGSSTR {}", args_str);
+            let mut args = args_str.split_whitespace();
+            let mut cmd: &str = &args_str;
+
             let prog = args.next();
             
             // Ctrl+D handler: exit
