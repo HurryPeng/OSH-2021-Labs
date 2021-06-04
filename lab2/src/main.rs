@@ -9,16 +9,27 @@ use std::fs::File;
 fn main() -> !
 {
     // Ctrl+C handler: clear current line and start a new line
-    ctrlc::set_handler(||{
+    ctrlc::set_handler
+    (||{
         let dir_err = "Getting current dir failed";
-        print!("\n{}# ", env::current_dir().expect(dir_err).to_str().expect(dir_err));
+        print!
+        (
+            "{}:{}# ",
+            env::var_os("LOGNAME").unwrap().to_str().unwrap(), 
+            env::current_dir().expect(dir_err).to_str().expect(dir_err)
+        );
         stdout().flush().unwrap();
     }).expect("set handle error");
 
     loop
     {
         let dir_err = "Getting current dir failed";
-        print!("{}# ", env::current_dir().expect(dir_err).to_str().expect(dir_err));
+        print!
+        (
+            "{}:{}# ",
+            env::var_os("LOGNAME").unwrap().to_str().unwrap(), 
+            env::current_dir().expect(dir_err).to_str().expect(dir_err)
+        );
         stdout().flush().unwrap();
         
         let mut input = String::new();
@@ -75,6 +86,8 @@ fn main() -> !
                             Stdio::inherit(),
                             |output: Child| Stdio::from(output.stdout.unwrap())
                         );
+                    let mut delayed_stdin = false;
+                    let mut delayed_stdin_string = "";
 
                     let mut stdout = if cmds.peek().is_some() {
                         // there is another command piped behind this one
@@ -96,6 +109,17 @@ fn main() -> !
                         stdin = Stdio::from(inputfile);
                     }
 
+                    // "<<<" support
+                    file_redirect_split = cmd.split(" <<< ").collect();
+                    if file_redirect_split.len() == 2
+                    {
+                        cmd = file_redirect_split[0];
+                        delayed_stdin = true;
+                        delayed_stdin_string = file_redirect_split[1];
+                        stdin = Stdio::piped();
+                    }
+
+                    // ">" support
                     file_redirect_split = cmd.split(" > ").collect();
                     if file_redirect_split.len() == 2
                     {
@@ -104,7 +128,8 @@ fn main() -> !
                         let outputfile = File::create(filename).expect("Cannot open file");
                         stdout = Stdio::from(outputfile);
                     }
-
+                    
+                    // ">>" support
                     file_redirect_split = cmd.split(" >> ").collect();
                     if file_redirect_split.len() == 2
                     {
@@ -118,19 +143,20 @@ fn main() -> !
                     args = cmd.split_whitespace();
                     prog = args.next().unwrap();
                     
-                    let output = Command::new(prog)
+                    let mut output = Command::new(prog)
                         .args(args)
                         .stdin(stdin)
                         .stdout(stdout)
-                        .spawn();
-                
-                    match output {
-                        Ok(output) => { prev_cmd = Some(output); },
-                        Err(e) => {
-                            prev_cmd = None;
-                            eprintln!("{}", e);
-                        },
-                    };
+                        .spawn()
+                        .expect("execution error");
+                    
+                    if delayed_stdin == true
+                    {
+                        let mut delayed_stdin_child = output.stdin.take().expect("Failed to open stdin");
+                        delayed_stdin_child.write_all(delayed_stdin_string.as_bytes()).expect("Failed to write to stdin");
+                    }
+
+                    prev_cmd = Some(output);
 
                     if let Some(ref mut final_cmd) = prev_cmd {
                         // block until the final command has finished
