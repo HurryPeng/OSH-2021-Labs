@@ -25,6 +25,7 @@ fn main() -> !
 
     loop
     {
+        // Username and cwd display
         let dir_err = "Getting current dir failed";
         print!
         (
@@ -34,6 +35,7 @@ fn main() -> !
         );
         stdout().flush().unwrap();
         
+        // Read line
         let mut input = String::new();
         for line_res in stdin().lock().lines()
         {
@@ -42,9 +44,11 @@ fn main() -> !
             break;
         }
 
+        // Split pipe commands
         let mut cmds = input.trim().split(" | ").peekable();
         let mut prev_cmd = None;
 
+        // Process each command
         while let Some(cmd) = cmds.next()
         {
             // Environment variable substitution
@@ -61,7 +65,7 @@ fn main() -> !
                 args_str += &arg_temp;
                 args_str += " ";
             }
-            // let args = args_str.split_whitespace();
+            //let args = args_str.split_whitespace();
             let cmd: &str = &args_str;
 
             // Alias substitution
@@ -83,16 +87,13 @@ fn main() -> !
             let mut cmd: &str = &args_str;
 
             let prog = args.next();
-            
             // Ctrl+D handler: exit
             if !prog.is_some()
             {
                 println!("bye!");
                 exit(0);
             }
-
             let prog = prog.unwrap();
-
             match prog
             {
                 "cd" =>
