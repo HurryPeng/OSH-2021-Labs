@@ -35,7 +35,7 @@ fn main() -> !
         while let Some(mut cmd) = cmds.next()
         {
             let mut args = cmd.split_whitespace();
-            let mut prog = args.next();
+            let prog = args.next();
             
             // Ctrl+D handler: exit
             if !prog.is_some()
@@ -44,7 +44,7 @@ fn main() -> !
                 exit(0);
             }
 
-            let mut prog = prog.unwrap();
+            let prog = prog.unwrap();
 
             match prog
             {
@@ -86,17 +86,35 @@ fn main() -> !
                         Stdio::inherit()
                     };
 
-                    let file_redirect_split: Vec<&str> = cmd.split(" < ").collect();
-                    //println!("debug: {:?}", cmd);
-                    //println!("debug: {:?}", file_redirect_split);
+                    // "<" support
+                    let mut file_redirect_split: Vec<&str> = cmd.split(" < ").collect();
                     if file_redirect_split.len() == 2
                     {
                         cmd = file_redirect_split[0];
                         let filename = file_redirect_split[1];
-                        let inputfile = File::open(filename).unwrap();
+                        let inputfile = File::open(filename).expect("Cannot open file");
                         stdin = Stdio::from(inputfile);
                     }
 
+                    file_redirect_split = cmd.split(" > ").collect();
+                    if file_redirect_split.len() == 2
+                    {
+                        cmd = file_redirect_split[0];
+                        let filename = file_redirect_split[1];
+                        let outputfile = File::create(filename).expect("Cannot open file");
+                        stdout = Stdio::from(outputfile);
+                    }
+
+                    file_redirect_split = cmd.split(" >> ").collect();
+                    if file_redirect_split.len() == 2
+                    {
+                        cmd = file_redirect_split[0];
+                        let filename = file_redirect_split[1];
+                        let outputfile = std::fs::OpenOptions::new().append(true).open(filename).expect("Cannot open file");
+                        stdout = Stdio::from(outputfile);
+                    }
+
+                    // reparse args and prog
                     args = cmd.split_whitespace();
                     prog = args.next().unwrap();
                     
