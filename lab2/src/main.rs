@@ -86,7 +86,7 @@ fn main() -> !
                             Stdio::inherit(),
                             |output: Child| Stdio::from(output.stdout.unwrap())
                         );
-                    let mut delayed_stdin = false;
+                    let mut delayed_stdin = 0;
                     let mut delayed_stdin_string = "";
 
                     let mut stdout = if cmds.peek().is_some() {
@@ -109,12 +109,22 @@ fn main() -> !
                         stdin = Stdio::from(inputfile);
                     }
 
+                    // "<<" support
+                    file_redirect_split = cmd.split(" << ").collect();
+                    if file_redirect_split.len() == 2
+                    {
+                        cmd = file_redirect_split[0];
+                        delayed_stdin = 1;
+                        delayed_stdin_string = file_redirect_split[1];
+                        stdin = Stdio::piped();
+                    }
+
                     // "<<<" support
                     file_redirect_split = cmd.split(" <<< ").collect();
                     if file_redirect_split.len() == 2
                     {
                         cmd = file_redirect_split[0];
-                        delayed_stdin = true;
+                        delayed_stdin = 2;
                         delayed_stdin_string = file_redirect_split[1];
                         stdin = Stdio::piped();
                     }
@@ -150,7 +160,33 @@ fn main() -> !
                         .spawn()
                         .expect("execution error");
                     
-                    if delayed_stdin == true
+                    if delayed_stdin == 1 // "<<"
+                    {
+                        let mut delayed_stdin_child = output.stdin.take().expect("Failed to open stdin");
+                        let mut all_input = String::new();
+                        loop
+                        {
+                            print!("> ");
+                            std::io::stdout().flush().unwrap();
+
+                            let mut input = String::new();
+                            for line_res in std::io::stdin().lock().lines()
+                            {
+                                let line = line_res.expect("Read a line from stdin failed");
+                                input = line;
+                                break;
+                            }
+                            if input == delayed_stdin_string
+                            {
+                                break;
+                            }
+                            all_input += &input;
+                            all_input += "\n";
+                        }
+                        delayed_stdin_child.write_all(all_input.as_bytes()).expect("Failed to write to stdin");
+                    }
+
+                    if delayed_stdin == 2 // "<<<"
                     {
                         let mut delayed_stdin_child = output.stdin.take().expect("Failed to open stdin");
                         delayed_stdin_child.write_all(delayed_stdin_string.as_bytes()).expect("Failed to write to stdin");
