@@ -14,12 +14,14 @@ fn main() -> !
         let dir_err = "Getting current dir failed";
         print!
         (
-            "{}:{}# ",
+            "\n{}:{}# ",
             env::var_os("LOGNAME").unwrap().to_str().unwrap(), 
             env::current_dir().expect(dir_err).to_str().expect(dir_err)
         );
         stdout().flush().unwrap();
     }).expect("set handle error");
+
+    let mut alias_commands: Vec<(String, String)> = Vec::new();
 
     loop
     {
@@ -45,9 +47,9 @@ fn main() -> !
 
         while let Some(cmd) = cmds.next()
         {
+            // Environment variable substitution
             let raw_args: Vec<&str> = cmd.split_whitespace().collect();
             let mut args_str = String::new();
-            //let mut args = cmd.split_whitespace();
             for arg in raw_args {
                 let mut arg_temp = String::new();
                 arg_temp += &arg;
@@ -55,13 +57,28 @@ fn main() -> !
                 {
                     arg_temp = String::new();
                     arg_temp += env::var_os(arg.strip_prefix("$").unwrap()).unwrap().to_str().unwrap();
-                    //println!("FOUND! {}", arg_temp);
                 }
                 args_str += &arg_temp;
                 args_str += " ";
-                //println!("APPENDED {}", args_str);
             }
-            //println!("ARGSSTR {}", args_str);
+            // let args = args_str.split_whitespace();
+            let cmd: &str = &args_str;
+
+            // Alias substitution
+            let raw_args: Vec<&str> = cmd.split_whitespace().collect();
+            let mut args_str = String::new();
+            for arg in raw_args {
+                let mut arg_temp = String::from(arg);
+                for (alias0, alias1) in &alias_commands
+                {
+                    if alias0 == arg
+                    {
+                        arg_temp = String::from(alias1);
+                    }
+                }
+                args_str += &arg_temp;
+                args_str += " ";
+            }
             let mut args = args_str.split_whitespace();
             let mut cmd: &str = &args_str;
 
@@ -92,6 +109,24 @@ fn main() -> !
                         let value = assign.next().expect("No variable value");
                         env::set_var(name, value);
                     }
+                    prev_cmd = None;
+                }
+                "alias" =>
+                {
+                    // concat args
+                    let mut args_str = String::new();
+                    for arg in args {
+                        args_str += &arg;
+                        args_str += " ";
+                    }
+
+                    let mut assign = args_str.split("=");
+                    let name: String = String::from(assign.next().expect("No variable name"));
+                    let  mut value: String = String::from(assign.next().expect("No variable value"));
+                    value = String::from(value.trim().strip_prefix("'").unwrap().strip_suffix("'").unwrap());
+
+                    let new_alias = (name, value);
+                    alias_commands.push(new_alias);
                     prev_cmd = None;
                 }
                 "exit" =>
