@@ -159,7 +159,7 @@ fn main() -> !
                     if file_redirect_split.len() == 2
                     {
                         cmd = file_redirect_split[0];
-                        let filename = file_redirect_split[1];
+                        let filename = file_redirect_split[1].trim();
                         let inputfile = File::open(filename).expect("Cannot open file");
                         stdin = Stdio::from(inputfile);
                     }
@@ -170,7 +170,7 @@ fn main() -> !
                     {
                         cmd = file_redirect_split[0];
                         delayed_stdin = 1;
-                        delayed_stdin_string = file_redirect_split[1];
+                        delayed_stdin_string = file_redirect_split[1].trim();
                         stdin = Stdio::piped();
                     }
 
@@ -189,7 +189,7 @@ fn main() -> !
                     if file_redirect_split.len() == 2
                     {
                         cmd = file_redirect_split[0];
-                        let filename = file_redirect_split[1];
+                        let filename = file_redirect_split[1].trim();
                         let outputfile = File::create(filename).expect("Cannot open file");
                         stdout = Stdio::from(outputfile);
                     }
@@ -199,7 +199,7 @@ fn main() -> !
                     if file_redirect_split.len() == 2
                     {
                         cmd = file_redirect_split[0];
-                        let filename = file_redirect_split[1];
+                        let filename = file_redirect_split[1].trim();
                         let outputfile = std::fs::OpenOptions::new().append(true).open(filename).expect("Cannot open file");
                         stdout = Stdio::from(outputfile);
                     }
