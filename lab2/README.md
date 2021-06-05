@@ -137,3 +137,41 @@ MYECHO!
 
 ## 使用 strace 工具追踪系统调用
 
+执行命令`strace cat < out.txt | cat -n | grep Cargo >> out.txt`后，得到下列结果，其中省略了一些行：
+
+```bash
+execve("/bin/cat", ["cat"], 0x7fffcfacd480 /* 42 vars */) = 0
+brk(NULL)                               = 0x7fffe3985000
+access("/etc/ld.so.nohwcap", F_OK)      = -1 ENOENT (No such file or directory)
+mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fdb9f250000
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
+openat(AT_FDCWD, "/home/hurrypeng/shell/target/debug/deps/tls/haswell/x86_64/libc.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+stat("/home/hurrypeng/shell/target/debug/deps/tls/haswell/x86_64", 0x7fffeb6c3270) = -1 ENOENT (No such file or directory)
+openat(AT_FDCWD, "/home/hurrypeng/shell/target/debug/deps/tls/haswell/libc.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+stat("/home/hurrypeng/shell/target/debug/deps/tls/haswell", 0x7fffeb6c3270) = -1 ENOENT (No such file or directory)
+......
+read(0, "Cargo.lock\nCargo.toml\nfunctions."..., 131072) = 269
+write(1, "Cargo.lock\nCargo.toml\nfunctions."..., 269) = 269
+read(0, "", 131072)                     = 0
+munmap(0x7fdb9f030000, 139264)          = 0
+close(0)                                = 0
+close(1)                                = 0
+close(2)                                = 0
+exit_group(0)                           = ?
++++ exited with 0 +++
+```
+
+察阅一些系统调用的功能：
+
+### execve()
+
+将目前正在执行的进程替换成要执行的程序，相当于调用其他程序但不返回。
+
+### mmap()
+
+一种内存映射文件的方法，即将一个文件或者其它对象映射到进程的地址空间，实现文件磁盘地址和进程虚拟地址空间中一段虚拟地址的一一对映关系。
+
+### stat()
+
+取得指定文件的文件属性，包括设备编号、inode等信息，返回的信息存储在一个结构体中。
+
