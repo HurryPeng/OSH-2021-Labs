@@ -1,10 +1,10 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include <iostream>
+#include <cstring>
+#include <cstdlib>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <pthread.h>
+#include <thread>
 
 struct Pipe
 {
@@ -56,17 +56,21 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    pthread_t thread1, thread2;
+    //pthread_t thread1, thread2;
     struct Pipe pipe1;
     struct Pipe pipe2;
     pipe1.fd_send = fd1;
     pipe1.fd_recv = fd2;
     pipe2.fd_send = fd2;
     pipe2.fd_recv = fd1;
-    pthread_create(&thread1, NULL, handle_chat, (void *)&pipe1);
-    pthread_create(&thread2, NULL, handle_chat, (void *)&pipe2);
-    pthread_join(thread1, NULL);
-    pthread_join(thread2, NULL);
+
+    std::thread thread1(handle_chat, (void *)&pipe1);
+    std::thread thread2(handle_chat, (void *)&pipe2);
+    
+    thread1.join();
+    thread2.join();
+
+    std::cout << "Chatroom closed by clients. \n";
 
     return 0;
 }
