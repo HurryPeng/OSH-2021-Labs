@@ -12,15 +12,34 @@ struct Pipe
     int fd_recv;
 };
 
-void *handle_chat(void *data)
+void handle_chat(Pipe pipe)
 {
-    struct Pipe *pipe = (struct Pipe *)data;
-    char buffer[1024] = "Message:";
-    ssize_t len;
-    while ((len = recv(pipe->fd_send, buffer + 8, 1000, 0)) > 0)
-        send(pipe->fd_recv, buffer, len + 8, 0);
-    return NULL;
+    char buffer[1024] = "";
+    bool newLine = true;
+    for
+    (
+        ssize_t len = recv(pipe.fd_send, buffer, 1000, 0);
+        len > 0;
+        len = recv(pipe.fd_send, buffer, 1000, 0)
+    )
+    {
+        for (char *head = buffer; head != buffer + len; )
+        {
+            char *tail = strchr(head, '\n'); // find '\n'
+            // points to last character if not found
+            if (tail == nullptr) tail = buffer + len - 1;
+            if (newLine)
+            {
+                send(pipe.fd_recv, "Message:", 8, 0);
+                newLine = false;
+            }
+            send(pipe.fd_recv, buffer, tail - head + 1, 0);
+            if (*tail == '\n') newLine = true;
+            head = tail + 1;
+        }
+    }
 }
+        
 
 int main(int argc, char **argv)
 {
@@ -32,12 +51,12 @@ int main(int argc, char **argv)
         return 1;
     }
     
-    struct sockaddr_in addr;
+    sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
     addr.sin_port = htons(port);
     socklen_t addr_len = sizeof(addr);
-    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)))
+    if (bind(fd, (sockaddr *)&addr, sizeof(addr)))
     {
         perror("bind");
         return 1;
@@ -56,7 +75,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    //pthread_t thread1, thread2;
     struct Pipe pipe1;
     struct Pipe pipe2;
     pipe1.fd_send = fd1;
@@ -64,8 +82,8 @@ int main(int argc, char **argv)
     pipe2.fd_send = fd2;
     pipe2.fd_recv = fd1;
 
-    std::thread thread1(handle_chat, (void *)&pipe1);
-    std::thread thread2(handle_chat, (void *)&pipe2);
+    std::thread thread1(handle_chat, pipe1);
+    std::thread thread2(handle_chat, pipe2);
     
     thread1.join();
     thread2.join();
