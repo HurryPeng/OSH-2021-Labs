@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <thread>
 #include <string>
+#include <sstream>
 
 struct Pipe
 {
@@ -13,10 +14,46 @@ struct Pipe
     int fd_recv;
 };
 
+struct SendBuffer
+{
+    static const int SEND_SIZE;
+    std::string title;
+    std::string buffer;
+
+    SendBuffer(const std::string & _title) : title(_title) {}
+
+    void append(const char *head, std::streamsize count)
+    {
+        buffer.append(head, count);
+    }
+
+    bool readyToSend() const
+    {
+        return buffer.back() == '\n';
+    }
+
+    void send(int fd)
+    {
+        ::send(fd, title.c_str(), title.size(), 0);
+        const char *str = buffer.c_str();
+        const char *head = str;
+        for (; head - str + SEND_SIZE < buffer.length(); head += SEND_SIZE)
+            ::send(fd, head, SEND_SIZE, 0);
+        ::send(fd, head, buffer.length() - (head - str), 0);
+    }
+
+    void clear()
+    {
+        buffer.clear();
+    }
+};
+
+const int SendBuffer::SEND_SIZE = 1024;
+
 void handle_chat(Pipe pipe)
 {
     char recvBuffer[1024] = "";
-    std::string sendBuffer;
+    SendBuffer sendBuffer("Message:");
     //bool newLine = true;
     for
     (
@@ -32,10 +69,9 @@ void handle_chat(Pipe pipe)
             // points to last character if not found
             if (tail == nullptr) tail = recvBuffer + len - 1;
             sendBuffer.append(head, tail - head + 1);
-            if (sendBuffer.back() == '\n')
+            if (sendBuffer.readyToSend())
             {
-                send(pipe.fd_recv, "Message:", 8, 0);
-                send(pipe.fd_recv, sendBuffer.c_str(), sendBuffer.length(), 0);
+                sendBuffer.send(pipe.fd_recv);
                 sendBuffer.clear();
             }
             head = tail + 1;
