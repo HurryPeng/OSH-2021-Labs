@@ -54,7 +54,6 @@ void handle_chat(Pipe pipe)
 {
     char recvBuffer[1024] = "";
     SendBuffer sendBuffer("Message:");
-    //bool newLine = true;
     for
     (
         ssize_t len = recv(pipe.fd_send, recvBuffer, 1000, 0);
