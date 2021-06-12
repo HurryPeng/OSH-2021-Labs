@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <thread>
+#include <string>
 
 struct Pipe
 {
@@ -14,32 +15,33 @@ struct Pipe
 
 void handle_chat(Pipe pipe)
 {
-    char buffer[1024] = "";
-    bool newLine = true;
+    char recvBuffer[1024] = "";
+    std::string sendBuffer;
+    //bool newLine = true;
     for
     (
-        ssize_t len = recv(pipe.fd_send, buffer, 1000, 0);
+        ssize_t len = recv(pipe.fd_send, recvBuffer, 1000, 0);
         len > 0;
-        len = recv(pipe.fd_send, buffer, 1000, 0)
+        len = recv(pipe.fd_send, recvBuffer, 1000, 0)
     )
     {
-        for (char *head = buffer; head != buffer + len; )
+        recvBuffer[len] = '\0';
+        for (char *head = recvBuffer; head != recvBuffer + len; )
         {
             char *tail = strchr(head, '\n'); // find '\n'
             // points to last character if not found
-            if (tail == nullptr) tail = buffer + len - 1;
-            if (newLine)
+            if (tail == nullptr) tail = recvBuffer + len - 1;
+            sendBuffer.append(head, tail - head + 1);
+            if (sendBuffer.back() == '\n')
             {
                 send(pipe.fd_recv, "Message:", 8, 0);
-                newLine = false;
+                send(pipe.fd_recv, sendBuffer.c_str(), sendBuffer.length(), 0);
+                sendBuffer.clear();
             }
-            send(pipe.fd_recv, buffer, tail - head + 1, 0);
-            if (*tail == '\n') newLine = true;
             head = tail + 1;
         }
     }
 }
-        
 
 int main(int argc, char **argv)
 {
