@@ -10,7 +10,7 @@
 #include <sstream>
 #include <vector>
 
-const int MAX_CONNECTION = 4;
+const int MAX_CONNECTION = 32;
 
 std::mutex mutexStdio;
 
@@ -60,7 +60,7 @@ struct SendBuffer
     }
 };
 
-const int SendBuffer::SEND_SIZE = 1024;
+const int SendBuffer::SEND_SIZE = 1000;
 
 void handle_chat(const int id)
 {
@@ -158,7 +158,7 @@ int main(int argc, char **argv)
         // Refuse if full
         if (clientId == -1)
         {
-            send(clientFd, "Chatroom full, connection refused\n", 34, 0);
+            send(clientFd, "Chatroom full, connection refused. \n", 36, 0);
             {
                 std::lock_guard<std::mutex> lock(mutexStdio);
                 std::cout << "Connection refused. \n";
