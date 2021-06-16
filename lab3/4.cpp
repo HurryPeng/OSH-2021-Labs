@@ -56,7 +56,7 @@ struct HandleChatCoroutine
         {
             return std::coroutine_handle<promise_type>::from_promise(*this);
         }
-        std::suspend_never initial_suspend()
+        std::suspend_always initial_suspend()
         {
             return {};
         }
@@ -167,6 +167,120 @@ HandleChatCoroutine handle_chat(const int id)
     std::cout << "Connection closed by client " << id << '\n';
 }
 
+auto asyncAccept(int fd)
+{
+    struct Awaitable
+    {
+        int fd;
+
+        int clientFd;
+        bool acceptSuccess;
+
+        bool await_ready()
+        {
+            clientFd = accept(fd, nullptr, nullptr);
+            if (clientFd == -1 && errno == EAGAIN)
+            {
+                // No more pending requests
+                acceptSuccess = false;
+                return false;
+            }
+            else if (clientFd == -1)
+            {
+                perror("accept");
+                return 1;
+            }
+            acceptSuccess = true;
+            return true;
+        }
+        void await_suspend(std::coroutine_handle<> h) {}
+        std::optional<int> await_resume() const
+        {
+            if (acceptSuccess) return clientFd;
+            return {};
+        }
+    };
+
+    return Awaitable{ fd };
+}
+
+struct AcceptCoroutine
+{
+    struct promise_type
+    {
+        AcceptCoroutine get_return_object()
+        {
+            return std::coroutine_handle<promise_type>::from_promise(*this);
+        }
+        std::suspend_always initial_suspend()
+        {
+            return {};
+        }
+        std::suspend_never final_suspend() noexcept
+        {
+            return {};
+        }
+        void return_void() {}
+        void unhandled_exception() {};
+    };
+
+    std::coroutine_handle<promise_type> handle;
+
+    AcceptCoroutine(std::coroutine_handle<promise_type> h) : handle(h) {}
+};
+
+AcceptCoroutine handle_accept(int fd)
+{
+    while (true)
+    {
+        int clientFd = 0;
+        
+        while (true)
+        // Keep awaiting (returning control to event loop) until a new request is caught
+        {
+            if (auto optionalClientFd = co_await asyncAccept(fd))
+            {
+                clientFd = optionalClientFd.value();
+                break;
+            }
+        }
+
+        // Handle new connection
+        int clientId = -1;
+
+        // Check if there's room for the new client
+        for (int i = 0; i < MAX_CONNECTION; ++i)
+        {
+            if (clients[i].connected == false)
+            {
+                clientId = i;
+                break;
+            }
+        }
+
+        // Refuse if full
+        if (clientId == -1)
+        {
+            send(clientFd, "Chatroom full, connection refused. \n", 36, 0);
+            std::cout << "Connection refused. \n";
+            shutdown(clientFd, 2);
+            close(clientFd);
+            continue;
+        }
+        
+        // Accept
+        fcntl(clientFd, F_SETFL, fcntl(clientFd, F_GETFL, 0) | O_NONBLOCK);
+        clients[clientId].connected = true;
+        clients[clientId].fd = clientFd;
+        clients[clientId].handle = handle_chat(clientId).handle;
+        send(clientFd, "Welcome to the chatroom! Your ID is ", 36, 0);
+        std::string clientIdStr = std::to_string(clientId);
+        send(clientFd, clientIdStr.c_str(), clientIdStr.length(), 0);
+        send(clientFd, "\n", 1, 0);
+        std::cout << "Connection accepted for client " << clientId << '\n';
+    }
+}
+
 int main(int argc, char **argv)
 {
     int port = atoi(argv[1]);
@@ -193,59 +307,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    while (true)
+    std::coroutine_handle<AcceptCoroutine::promise_type> acceptorHandle = handle_accept(fd).handle;
+
+    while (true) // Coroutine event loop
     {
-        while (true)
-        {
-            // Non-blocking accept()
-            int clientFd = accept(fd, nullptr, nullptr);
-            if (clientFd == -1 && errno == EAGAIN)
-            {
-                // No more pending requests
-                break;
-            }
-            else if (clientFd == -1)
-            {
-                perror("accept");
-                return 1;
-            }
-
-            // Handle new connection
-            int clientId = -1;
-
-            // Check if there's room for the new client
-            for (int i = 0; i < MAX_CONNECTION; ++i)
-            {
-                if (clients[i].connected == false)
-                {
-                    clientId = i;
-                    break;
-                }
-            }
-
-            // Refuse if full
-            if (clientId == -1)
-            {
-                send(clientFd, "Chatroom full, connection refused. \n", 36, 0);
-                std::cout << "Connection refused. \n";
-                shutdown(clientFd, 2);
-                close(clientFd);
-                continue;
-            }
-            
-            // Accept
-            fcntl(clientFd, F_SETFL, fcntl(clientFd, F_GETFL, 0) | O_NONBLOCK);
-            clients[clientId].connected = true;
-            clients[clientId].fd = clientFd;
-            clients[clientId].handle = handle_chat(clientId).handle;
-            send(clientFd, "Welcome to the chatroom! Your ID is ", 36, 0);
-            std::string clientIdStr = std::to_string(clientId);
-            send(clientFd, clientIdStr.c_str(), clientIdStr.length(), 0);
-            send(clientFd, "\n", 1, 0);
-            std::cout << "Connection accepted for client " << clientId << '\n';
-        }
-
-        // Coroutine event loop
+        acceptorHandle.resume();
         for (int i = 0; i < MAX_CONNECTION; ++i)
         {
             if (clients[i].connected == false) continue;
